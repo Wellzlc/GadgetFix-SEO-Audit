@@ -1,44 +1,4 @@
-name: SEO Audit System
-on:
-  # Daily audits - optimized for free tier (under 200 min/month)
-  schedule:
-    - cron: '0 8 * * *'    # 8 AM UTC daily
-    - cron: '0 20 * * *'   # 8 PM UTC daily  
-    - cron: '0 2 * * 0'    # Sunday 2 AM UTC (weekly deep dive)
-  
-  # Manual trigger
-  workflow_dispatch:
-    inputs:
-      audit_type:
-        description: 'Audit Type'
-        required: true
-        default: 'quick'
-        type: choice
-        options:
-        - quick
-        - full
-        - deep
-
-jobs:
-  seo-audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 lxml
-    
-    - name: Create Complete SEO System
+- name: Create Complete SEO System
       run: |
         mkdir -p scripts reports
         
@@ -54,7 +14,6 @@ jobs:
         import re
         
         def run_seo_audit(url, audit_type="quick"):
-            """Complete SEO audit function"""
             print(f"🔍 Starting {audit_type} SEO audit for: {url}")
             
             results = {
@@ -81,7 +40,7 @@ jobs:
                 
                 score = 0
                 
-                # 1. Title Tag Analysis (15 points)
+                # Title Tag Analysis (15 points)
                 title_tag = soup.find('title')
                 if title_tag:
                     title_text = title_tag.get_text().strip()
@@ -94,18 +53,18 @@ jobs:
                     elif len(title_text) > 0:
                         score += 8
                         results["warnings"] += 1
-                        results["issues"].append(f"Title length suboptimal: {len(title_text)} chars (should be 30-60)")
-                        results["recommendations"].append("Optimize title to 30-60 characters for better SERP display")
+                        results["issues"].append(f"Title length suboptimal: {len(title_text)} chars")
+                        results["recommendations"].append("Optimize title to 30-60 characters")
                     else:
                         results["critical_issues"] += 1
                         results["issues"].append("Title tag is empty")
-                        results["recommendations"].append("Add a descriptive, keyword-rich title tag")
+                        results["recommendations"].append("Add a descriptive title tag")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: Missing title tag")
-                    results["recommendations"].append("URGENT: Add a title tag to your page")
+                    results["recommendations"].append("URGENT: Add a title tag")
                 
-                # 2. Meta Description (15 points)
+                # Meta Description (15 points)
                 meta_desc = soup.find('meta', attrs={'name': 'description'})
                 if meta_desc and meta_desc.get('content'):
                     desc_text = meta_desc.get('content').strip()
@@ -118,7 +77,7 @@ jobs:
                     elif len(desc_text) > 0:
                         score += 8
                         results["warnings"] += 1
-                        results["issues"].append(f"Meta description length: {len(desc_text)} chars (should be 120-160)")
+                        results["issues"].append(f"Meta description length: {len(desc_text)} chars")
                         results["recommendations"].append("Optimize meta description to 120-160 characters")
                     else:
                         results["critical_issues"] += 1
@@ -127,9 +86,9 @@ jobs:
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: Missing meta description")
-                    results["recommendations"].append("URGENT: Add a meta description for better click-through rates")
+                    results["recommendations"].append("URGENT: Add a meta description")
                 
-                # 3. Heading Structure (10 points)
+                # Heading Structure (10 points)
                 h1_tags = soup.find_all('h1')
                 if len(h1_tags) == 1:
                     score += 10
@@ -138,24 +97,13 @@ jobs:
                 elif len(h1_tags) == 0:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: No H1 tag found")
-                    results["recommendations"].append("URGENT: Add one H1 tag to establish page hierarchy")
+                    results["recommendations"].append("URGENT: Add one H1 tag")
                 else:
                     results["warnings"] += 1
-                    results["issues"].append(f"Multiple H1 tags found: {len(h1_tags)} (should be 1)")
-                    results["recommendations"].append("Use only one H1 tag per page for proper SEO structure")
+                    results["issues"].append(f"Multiple H1 tags found: {len(h1_tags)}")
+                    results["recommendations"].append("Use only one H1 tag per page")
                 
-                # Check H2-H6 structure
-                h2_tags = soup.find_all('h2')
-                h3_tags = soup.find_all('h3')
-                results["heading_structure"] = {
-                    "h1": len(h1_tags), "h2": len(h2_tags), "h3": len(h3_tags)
-                }
-                
-                if len(h2_tags) > 0:
-                    score += 5
-                    print(f"✅ Good heading structure with {len(h2_tags)} H2 tags")
-                
-                # 4. Image Optimization (10 points)
+                # Image Optimization (10 points)
                 images = soup.find_all('img')
                 images_without_alt = [img for img in images if not img.get('alt')]
                 results["total_images"] = len(images)
@@ -171,13 +119,13 @@ jobs:
                     elif alt_percentage >= 80:
                         score += 7
                         results["warnings"] += 1
-                        results["issues"].append(f"Good alt text coverage: {alt_percentage:.1f}% (aim for 95%+)")
+                        results["issues"].append(f"Good alt text coverage: {alt_percentage:.1f}%")
                     else:
                         results["critical_issues"] += 1
                         results["issues"].append(f"CRITICAL: Poor alt text coverage: {alt_percentage:.1f}%")
-                        results["recommendations"].append(f"Add alt text to {len(images_without_alt)} images for accessibility and SEO")
+                        results["recommendations"].append(f"Add alt text to {len(images_without_alt)} images")
                 
-                # 5. Internal Linking (10 points)
+                # Internal Linking (10 points)
                 all_links = soup.find_all('a', href=True)
                 internal_links = []
                 for link in all_links:
@@ -194,13 +142,13 @@ jobs:
                 elif len(internal_links) >= 2:
                     score += 6
                     results["warnings"] += 1
-                    results["issues"].append(f"Moderate internal linking: {len(internal_links)} links (aim for 5+)")
+                    results["issues"].append(f"Moderate internal linking: {len(internal_links)} links")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append(f"CRITICAL: Poor internal linking: {len(internal_links)} links")
-                    results["recommendations"].append("Add more internal links to improve site navigation and SEO")
+                    results["recommendations"].append("Add more internal links")
                 
-                # 6. Page Speed Assessment (15 points)
+                # Page Speed Assessment (15 points)
                 if results["response_time_ms"] <= 1000:
                     score += 15
                     print(f"✅ Excellent response time: {results['response_time_ms']}ms")
@@ -210,43 +158,42 @@ jobs:
                 elif results["response_time_ms"] <= 3000:
                     score += 8
                     results["warnings"] += 1
-                    results["issues"].append(f"Moderate response time: {results['response_time_ms']}ms (aim for <1000ms)")
-                    results["recommendations"].append("Optimize images and enable compression to improve page speed")
+                    results["issues"].append(f"Moderate response time: {results['response_time_ms']}ms")
+                    results["recommendations"].append("Optimize images and enable compression")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append(f"CRITICAL: Slow response time: {results['response_time_ms']}ms")
-                    results["recommendations"].append("URGENT: Improve page loading speed - consider CDN, optimize images, minify CSS/JS")
+                    results["recommendations"].append("URGENT: Improve page loading speed")
                 
-                # 7. HTTPS Security (10 points)
+                # HTTPS Security (10 points)
                 if url.startswith('https://'):
                     score += 10
-                    print("✅ HTTPS enabled - secure connection")
+                    print("✅ HTTPS enabled")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: Site not using HTTPS")
-                    results["recommendations"].append("URGENT: Enable HTTPS for security and SEO ranking boost")
+                    results["recommendations"].append("URGENT: Enable HTTPS")
                 
-                # 8. Mobile Optimization (10 points)
+                # Mobile Optimization (10 points)
                 viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
                 if viewport_meta:
                     score += 10
-                    print("✅ Viewport meta tag found - mobile optimized")
+                    print("✅ Viewport meta tag found")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: Missing viewport meta tag")
-                    results["recommendations"].append("URGENT: Add viewport meta tag for mobile optimization")
+                    results["recommendations"].append("URGENT: Add viewport meta tag")
                 
-                # 9. Schema Markup (5 points)
+                # Schema Markup (5 points)
                 schema_scripts = soup.find_all('script', type='application/ld+json')
                 if schema_scripts:
                     score += 5
                     results["schema_markup_count"] = len(schema_scripts)
                     print(f"✅ Schema markup found: {len(schema_scripts)} blocks")
                 else:
-                    results["warnings"] += 1
-                    results["recommendations"].append("Add schema markup for rich snippets and better search visibility")
+                    results["recommendations"].append("Add schema markup for rich snippets")
                 
-                # 10. Content Analysis (5 points)
+                # Content Analysis (5 points)
                 text_content = soup.get_text()
                 word_count = len(text_content.split())
                 results["word_count"] = word_count
@@ -257,36 +204,16 @@ jobs:
                 elif word_count >= 100:
                     score += 3
                     results["warnings"] += 1
-                    results["issues"].append(f"Thin content: {word_count} words (aim for 300+)")
+                    results["issues"].append(f"Thin content: {word_count} words")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append(f"CRITICAL: Very thin content: {word_count} words")
-                    results["recommendations"].append("Add more substantial, valuable content (aim for 300+ words)")
+                    results["recommendations"].append("Add more substantial content (300+ words)")
                 
-                # 11. Additional Technical Checks (5 points)
-                # Check for robots meta
-                robots_meta = soup.find('meta', attrs={'name': 'robots'})
-                if robots_meta:
-                    robots_content = robots_meta.get('content', '').lower()
-                    if 'noindex' in robots_content:
-                        results["critical_issues"] += 1
-                        results["issues"].append("CRITICAL: Page has noindex directive")
-                        results["recommendations"].append("Remove noindex if you want this page to appear in search results")
-                    else:
-                        score += 2
-                
-                # Check for canonical tag
-                canonical = soup.find('link', rel='canonical')
-                if canonical:
-                    score += 3
-                    results["canonical_url"] = canonical.get('href')
-                    print("✅ Canonical tag found")
-                
-                # Final score calculation
+                # Final calculations
                 results["score"] = min(score, 100)
                 results["grade"] = get_seo_grade(results["score"])
                 
-                # Priority classification
                 if results["score"] >= 90:
                     results["priority"] = "LOW"
                 elif results["score"] >= 70:
@@ -300,26 +227,11 @@ jobs:
                 print(f"📊 Priority Level: {results['priority']}")
                 print(f"🚨 Critical Issues: {results['critical_issues']}")
                 print(f"⚠️  Warnings: {results['warnings']}")
-                print(f"💡 Total Recommendations: {len(results['recommendations'])}")
                 
                 return results
                 
-            except requests.exceptions.Timeout:
-                error_msg = f"Timeout: Site took longer than 15 seconds to respond"
-                print(f"❌ {error_msg}")
-                results["error"] = error_msg
-                results["critical_issues"] = 1
-                results["priority"] = "CRITICAL"
-                return results
-            except requests.exceptions.RequestException as e:
-                error_msg = f"Network error: {str(e)}"
-                print(f"❌ {error_msg}")
-                results["error"] = error_msg
-                results["critical_issues"] = 1
-                results["priority"] = "CRITICAL"
-                return results
             except Exception as e:
-                error_msg = f"Unexpected error: {str(e)}"
+                error_msg = f"Error during audit: {str(e)}"
                 print(f"❌ {error_msg}")
                 results["error"] = error_msg
                 results["critical_issues"] = 1
@@ -327,7 +239,6 @@ jobs:
                 return results
         
         def get_seo_grade(score):
-            """Convert score to letter grade"""
             if score >= 95: return "A+"
             elif score >= 90: return "A"
             elif score >= 85: return "A-"
@@ -364,177 +275,96 @@ jobs:
             
             # Exit with appropriate code
             if "error" in results or results.get("critical_issues", 0) > 2:
-                print("🚨 Critical issues detected - exiting with error code")
+                print("🚨 Critical issues detected")
                 sys.exit(1)
             else:
                 print("🎉 Audit completed successfully!")
                 sys.exit(0)
         EOF
         
-        # Create the enhanced notification script
+        # Create notification script
         cat > scripts/send-notifications.py << 'EOF'
         #!/usr/bin/env python3
         import json
         import os
         import sys
-        import requests
         from datetime import datetime
         
-        class NotificationSystem:
-            def __init__(self):
-                self.email = os.getenv('EMAIL_ADDRESS', 'wellz.levi@gmail.com')
-                self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL', '')
-                self.discord_webhook = os.getenv('DISCORD_WEBHOOK_URL', '')
-                self.github_repo = os.getenv('GITHUB_REPOSITORY', '')
-                self.github_run_id = os.getenv('GITHUB_RUN_ID', '')
+        def send_notifications(audit_type, status, url, results_file):
+            print(f"\n📢 SENDING NOTIFICATIONS")
+            print("=" * 50)
             
-            def send_all_notifications(self, audit_type, status, url, results_file):
-                """Send notifications through all channels"""
-                results = self.load_results(results_file)
-                
-                print(f"\n📢 SENDING NOTIFICATIONS")
-                print("=" * 50)
-                
-                # 1. Console notification (always)
-                self.console_notification(audit_type, status, url, results)
-                
-                # 2. Email notification (always)
-                self.email_notification(audit_type, status, url, results)
-                
-                # 3. Slack (if configured)
-                if self.slack_webhook:
-                    self.slack_notification(audit_type, status, url, results)
-                
-                # 4. Discord (if configured)  
-                if self.discord_webhook:
-                    self.discord_notification(audit_type, status, url, results)
-                
-                # 5. Prepare GitHub issue data for critical issues
-                if self.is_critical(results, status):
-                    self.prepare_github_issue(audit_type, status, url, results)
-                
-                print("✅ All notifications sent successfully!")
-                return True
-            
-            def load_results(self, results_file):
-                """Load audit results"""
-                if not results_file or not os.path.exists(results_file):
-                    return {"error": "No results file"}
+            # Load results
+            results = {}
+            if results_file and os.path.exists(results_file):
                 try:
                     with open(results_file, 'r') as f:
-                        return json.load(f)
+                        results = json.load(f)
                 except:
-                    return {"error": "Could not load results"}
+                    results = {"error": "Could not load results"}
             
-            def is_critical(self, results, status):
-                """Check if this is a critical issue"""
-                if status == "failure" or "error" in results:
-                    return True
-                return results.get("critical_issues", 0) > 2 or results.get("score", 100) < 50
+            email = os.getenv('EMAIL_ADDRESS', 'wellz.levi@gmail.com')
             
-            def console_notification(self, audit_type, status, url, results):
-                """Detailed console notification"""
-                print(f"\n📧 EMAIL NOTIFICATION FOR: {self.email}")
-                print("=" * 60)
+            # Determine urgency
+            is_critical = (status == "failure" or "error" in results or 
+                          results.get("critical_issues", 0) > 2 or 
+                          results.get("score", 100) < 50)
+            
+            if is_critical:
+                urgency = "🚨 CRITICAL"
+                subject = f"🚨 CRITICAL SEO Issues - {url}"
+            elif results.get("score", 100) < 70:
+                urgency = "⚠️ HIGH"
+                subject = f"⚠️ SEO Problems Found - {url}"
+            elif audit_type == "deep":
+                urgency = "📊 WEEKLY REPORT"
+                subject = f"📊 Weekly SEO Report - {url}"
+            else:
+                urgency = "✅ ROUTINE"
+                subject = f"✅ SEO Audit Complete - {url}"
+            
+            print(f"📧 EMAIL NOTIFICATION FOR: {email}")
+            print(f"📬 Subject: {subject}")
+            print(f"🎯 Urgency: {urgency}")
+            print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}")
+            
+            if "error" not in results:
+                score = results.get("score", 0)
+                grade = results.get("grade", "N/A")
                 
-                # Determine urgency
-                if self.is_critical(results, status):
-                    urgency = "🚨 CRITICAL"
-                    subject = f"🚨 CRITICAL SEO Issues - {url}"
-                elif results.get("score", 100) < 70:
-                    urgency = "⚠️ HIGH"
-                    subject = f"⚠️ SEO Problems Found - {url}"
-                elif audit_type == "deep":
-                    urgency = "📊 WEEKLY REPORT"
-                    subject = f"📊 Weekly SEO Report - {url}"
-                else:
-                    urgency = "✅ ROUTINE"
-                    subject = f"✅ SEO Audit Complete - {url}"
+                print(f"\n📊 PERFORMANCE SUMMARY:")
+                print(f"   🎯 SEO Score: {score}/100 ({grade})")
+                print(f"   ⚡ Response Time: {results.get('response_time_ms', 'N/A')}ms")
+                print(f"   📄 Content: {results.get('word_count', 'N/A')} words")
+                print(f"   🔗 Internal Links: {results.get('internal_links_count', 'N/A')}")
+                print(f"   🖼️ Images: {results.get('total_images', 'N/A')} total")
                 
-                print(f"📬 Subject: {subject}")
-                print(f"🎯 Urgency: {urgency}")
-                print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}")
+                critical = results.get("critical_issues", 0)
+                warnings = results.get("warnings", 0)
                 
-                if "error" not in results:
-                    score = results.get("score", 0)
-                    grade = results.get("grade", "N/A")
-                    
-                    print(f"\n📊 PERFORMANCE SUMMARY:")
-                    print(f"   🎯 SEO Score: {score}/100 ({grade})")
-                    print(f"   ⚡ Response Time: {results.get('response_time_ms', 'N/A')}ms")
-                    print(f"   📄 Content: {results.get('word_count', 'N/A')} words")
-                    print(f"   🔗 Internal Links: {results.get('internal_links_count', 'N/A')}")
-                    print(f"   🖼️ Images: {results.get('total_images', 'N/A')} total")
-                    
-                    critical = results.get("critical_issues", 0)
-                    warnings = results.get("warnings", 0)
-                    
-                    if critical > 0:
-                        print(f"\n🚨 CRITICAL ISSUES ({critical}):")
-                        for issue in [i for i in results.get("issues", []) if "CRITICAL" in i][:5]:
-                            print(f"   • {issue}")
-                    
-                    if warnings > 0:
-                        print(f"\n⚠️ WARNINGS ({warnings}):")
-                        for issue in [i for i in results.get("issues", []) if "CRITICAL" not in i][:3]:
-                            print(f"   • {issue}")
-                    
-                    if results.get("recommendations"):
-                        print(f"\n💡 TOP RECOMMENDATIONS:")
-                        for rec in results["recommendations"][:5]:
-                            print(f"   • {rec}")
-                else:
-                    print(f"\n❌ AUDIT ERROR: {results['error']}")
+                if critical > 0:
+                    print(f"\n🚨 CRITICAL ISSUES ({critical}):")
+                    for issue in [i for i in results.get("issues", []) if "CRITICAL" in i][:5]:
+                        print(f"   • {issue}")
                 
-                print(f"\n🔗 QUICK ACTIONS:")
-                print(f"   • Test your site: {url}")
-                print(f"   • Page speed test: https://pagespeed.web.dev/?url={url}")
-                if self.github_repo:
-                    print(f"   • Full report: https://github.com/{self.github_repo}/actions/runs/{self.github_run_id}")
+                if warnings > 0:
+                    print(f"\n⚠️ WARNINGS ({warnings}):")
+                    for issue in [i for i in results.get("issues", []) if "CRITICAL" not in i][:3]:
+                        print(f"   • {issue}")
                 
-                print("=" * 60)
+                if results.get("recommendations"):
+                    print(f"\n💡 TOP RECOMMENDATIONS:")
+                    for rec in results["recommendations"][:5]:
+                        print(f"   • {rec}")
+            else:
+                print(f"\n❌ AUDIT ERROR: {results['error']}")
             
-            def email_notification(self, audit_type, status, url, results):
-                """Email notification content"""
-                print(f"📧 Email notification prepared for {self.email}")
-                print("✅ Email content generated successfully")
+            print(f"\n🔗 QUICK ACTIONS:")
+            print(f"   • Test your site: {url}")
+            print(f"   • Page speed test: https://pagespeed.web.dev/?url={url}")
             
-            def slack_notification(self, audit_type, status, url, results):
-                """Send Slack notification"""
-                try:
-                    score = results.get("score", 0)
-                    payload = {
-                        "text": f"SEO Audit {status.upper()} for {url}",
-                        "attachments": [{
-                            "color": "#ff0000" if self.is_critical(results, status) else "#00ff00",
-                            "title": f"Score: {score}/100",
-                            "fields": [
-                                {"title": "Issues", "value": str(results.get("critical_issues", 0)), "short": True},
-                                {"title": "Type", "value": audit_type, "short": True}
-                            ]
-                        }]
-                    }
-                    requests.post(self.slack_webhook, json=payload, timeout=5)
-                    print("✅ Slack notification sent")
-                except:
-                    print("❌ Slack notification failed")
-            
-            def discord_notification(self, audit_type, status, url, results):
-                """Send Discord notification"""
-                try:
-                    score = results.get("score", 0)
-                    embed = {
-                        "title": f"SEO Audit {status.upper()}",
-                        "description": f"**{url}**\nScore: {score}/100",
-                        "color": 0xff0000 if self.is_critical(results, status) else 0x00ff00
-                    }
-                    requests.post(self.discord_webhook, json={"embeds": [embed]}, timeout=5)
-                    print("✅ Discord notification sent")
-                except:
-                    print("❌ Discord notification failed")
-            
-            def prepare_github_issue(self, audit_type, status, url, results):
-                """Prepare GitHub issue for critical problems"""
+            # Prepare GitHub issue data for critical issues
+            if is_critical:
                 issue_data = {
                     "audit_type": audit_type,
                     "status": status,
@@ -547,6 +377,9 @@ jobs:
                     json.dump(issue_data, f, indent=2)
                 
                 print("📝 Critical GitHub issue data prepared")
+            
+            print("✅ All notifications sent successfully!")
+            return True
         
         if __name__ == "__main__":
             import argparse
@@ -557,104 +390,8 @@ jobs:
             parser.add_argument('--results', required=True)
             args = parser.parse_args()
             
-            notifier = NotificationSystem()
-            success = notifier.send_all_notifications(args.type, args.status, args.url, args.results)
+            success = send_notifications(args.type, args.status, args.url, args.results)
             sys.exit(0 if success else 1)
         EOF
         
         chmod +x scripts/*.py
-    
-    - name: Run SEO Audit
-      env:
-        WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
-      run: |
-        echo "🚀 Starting comprehensive SEO audit..."
-        audit_type="${{ github.event.inputs.audit_type || 'quick' }}"
-        python scripts/seo-audit.py "$audit_type"
-    
-    - name: Send Notifications
-      if: always()
-      env:
-        EMAIL_ADDRESS: wellz.levi@gmail.com
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_RUN_ID: ${{ github.run_id }}
-      run: |
-        python scripts/send-notifications.py \
-          --type "${{ github.event.inputs.audit_type || 'quick' }}" \
-          --status "${{ job.status }}" \
-          --url "${{ secrets.WEBSITE_URL }}" \
-          --results "seo-results.json"
-    
-    - name: Upload Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: seo-audit-${{ github.event.inputs.audit_type || 'quick' }}-${{ github.run_number }}
-        path: |
-          reports/
-          seo-results.json
-          github-issue-data.json
-        retention-days: 30
-    
-    - name: Create Critical GitHub Issue
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          try {
-            if (!fs.existsSync('github-issue-data.json')) return;
-            
-            const data = JSON.parse(fs.readFileSync('github-issue-data.json', 'utf8'));
-            const results = data.results;
-            
-            const criticalIssues = (results.issues || []).filter(i => i.includes('CRITICAL'));
-            const warnings = (results.issues || []).filter(i => !i.includes('CRITICAL'));
-            
-            const issueBody = `# 🚨 Critical SEO Problems Detected
-            
-**Website:** ${results.url}  
-**Audit Time:** ${data.timestamp}  
-**SEO Score:** ${results.score || 0}/100 (${results.grade || 'N/A'})  
-**Priority:** ${results.priority || 'HIGH'}
-
-## 🚨 Critical Issues (${results.critical_issues || 0}):
-${criticalIssues.slice(0, 10).map(issue => `- ${issue}`).join('\n') || '- Site audit failed or unreachable'}
-
-${warnings.length > 0 ? `## ⚠️ Warnings (${warnings.length}):
-${warnings.slice(0, 5).map(w => `- ${w}`).join('\n')}` : ''}
-
-## 💡 Immediate Actions Required:
-${(results.recommendations || []).slice(0, 8).map(rec => `- ${rec}`).join('\n')}
-
-## 📊 Performance Metrics:
-- **Response Time:** ${results.response_time_ms || 'N/A'}ms
-- **Page Size:** ${results.content_size_kb || 'N/A'} KB  
-- **Word Count:** ${results.word_count || 'N/A'} words
-- **Internal Links:** ${results.internal_links_count || 'N/A'}
-- **Images without Alt:** ${results.images_without_alt || 'N/A'}/${results.total_images || 'N/A'}
-
-## 🔗 Quick Fixes:
-- [Test Page Speed](https://pagespeed.web.dev/?url=${encodeURIComponent(results.url)})
-- [Mobile-Friendly Test](https://search.google.com/test/mobile-friendly?url=${encodeURIComponent(results.url)})
-- [Rich Results Test](https://search.google.com/test/rich-results?url=${encodeURIComponent(results.url)})
-- [View Website](${results.url})
-
----
-**Next audit:** Scheduled for next run at 8 AM/PM UTC  
-**Automated SEO Monitoring** - ${new Date().toISOString()}`;
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🚨 SEO ALERT: ${results.score || 0}/100 - ${results.critical_issues || 0} Critical Issues`,
-              body: issueBody,
-              labels: ['seo-critical', 'needs-immediate-attention', 'automated']
-            });
-            
-            console.log('✅ Critical SEO issue created with detailed breakdown');
-          } catch (error) {
-            console.log('ℹ️ No critical issue created:', error.message);
-          }
