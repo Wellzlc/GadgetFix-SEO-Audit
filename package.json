@@ -1,0 +1,16 @@
+{
+  "name": "seo-audit-system",
+  "version": "1.0.0",
+  "description": "Automated SEO audit system",
+  "scripts": {
+    "test": "echo \"No tests specified\""
+  },
+  "dependencies": {
+    "lighthouse": "^11.0.0",
+    "psi": "^5.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
