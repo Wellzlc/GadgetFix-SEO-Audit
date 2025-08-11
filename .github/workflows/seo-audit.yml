@@ -86,7 +86,18 @@ jobs:
           *.json
         retention-days: 30
     
-   - name: Send Email Notification
+    - name: Show Results
+      if: always()
+      run: |
+        echo "=== SEO Audit Complete ==="
+        if [ -f "quick-results.json" ]; then
+          echo "✅ Results saved to quick-results.json"
+          cat quick-results.json
+        else
+          echo "❌ No results file found"
+        fi
+    
+    - name: Send Email Notification
       if: always()
       run: |
         echo "📧 Sending email notification..."
