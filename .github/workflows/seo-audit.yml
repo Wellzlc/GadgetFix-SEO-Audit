@@ -1,0 +1,178 @@
+name: SEO Audit System
+on:
+  # Optimal free-tier schedule
+  schedule:
+    - cron: '0 8 * * *'    # Daily at 8 AM UTC (3 AM EST)
+    - cron: '0 20 * * *'   # Daily at 8 PM UTC (3 PM EST)
+    - cron: '0 2 * * 0'    # Weekly deep audit (Sunday 2 AM UTC)
+  
+  # Manual trigger button
+  workflow_dispatch:
+    inputs:
+      audit_type:
+        description: 'Type of audit to run'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+        - quick
+        - full
+        - deep
+
+env:
+  WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
+  PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+
+jobs:
+  seo-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # Prevent runaway jobs
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        # Python dependencies
+        pip install -r requirements.txt
+        
+        # Node.js dependencies  
+        npm install -g lighthouse @lhci/cli psi
+        
+        # Other tools
+        sudo apt-get update
+        sudo apt-get install -y curl jq
+    
+    - name: Determine audit type
+      id: audit-type
+      run: |
+        if [ "${{ github.event.inputs.audit_type }}" != "" ]; then
+          echo "type=${{ github.event.inputs.audit_type }}" >> $GITHUB_OUTPUT
+        elif [ "$(date +%u)" = "7" ] && [ "$(date +%H)" = "02" ]; then
+          echo "type=deep" >> $GITHUB_OUTPUT
+        else
+          echo "type=quick" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Run Quick Health Check
+      if: steps.audit-type.outputs.type == 'quick'
+      run: |
+        echo "🔍 Running quick SEO health check..."
+        python scripts/quick-check.py --url "$WEBSITE_URL"
+        
+        # Save results with timestamp
+        mkdir -p reports/$(date +%Y-%m)
+        cp quick-results.json reports/$(date +%Y-%m)/quick-$(date +%Y%m%d-%H%M).json
+    
+    - name: Run Full SEO Audit
+      if: steps.audit-type.outputs.type == 'full'
+      run: |
+        echo "🔬 Running full SEO audit..."
+        python scripts/technical-audit.py --url "$WEBSITE_URL"
+        python scripts/performance-audit.py --url "$WEBSITE_URL"
+        python scripts/content-audit.py --url "$WEBSITE_URL"
+        
+        # Generate combined report
+        python scripts/generate-report.py --type full
+        
+        # Save results
+        mkdir -p reports/$(date +%Y-%m)
+        cp full-audit-report.html reports/$(date +%Y-%m)/full-$(date +%Y%m%d-%H%M).html
+    
+    - name: Run Deep Weekly Audit
+      if: steps.audit-type.outputs.type == 'deep'
+      run: |
+        echo "🎯 Running comprehensive weekly audit..."
+        python scripts/technical-audit.py --url "$WEBSITE_URL" --deep
+        python scripts/performance-audit.py --url "$WEBSITE_URL" --historical
+        python scripts/content-audit.py --url "$WEBSITE_URL" --competitive
+        python scripts/competitive-audit.py --url "$WEBSITE_URL"
+        
+        # Generate executive report
+        python scripts/generate-report.py --type executive
+        
+        # Save results
+        mkdir -p reports/$(date +%Y-%m)
+        cp weekly-executive-report.html reports/$(date +%Y-%m)/weekly-$(date +%Y%m%d).html
+    
+    - name: Check for Critical Issues
+      run: |
+        echo "🚨 Checking for critical SEO issues..."
+        python scripts/alert-checker.py
+        
+        # If critical issues found, create issue
+        if [ -f "critical-issues.json" ]; then
+          echo "Critical issues detected!"
+          python scripts/create-github-issue.py
+        fi
+    
+    - name: Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: seo-audit-results-${{ steps.audit-type.outputs.type }}-${{ github.run_number }}
+        path: |
+          reports/
+          *.json
+          *.html
+        retention-days: 30
+    
+    - name: Update Dashboard Data
+      run: |
+        echo "📊 Updating dashboard data..."
+        python scripts/update-dashboard-data.py
+        
+        # Commit updated data back to repo
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add dashboard-data/
+        git diff --staged --quiet || git commit -m "Auto-update dashboard data $(date)"
+        git push
+    
+    - name: Send Notifications
+      if: failure() || (success() && contains(steps.audit-type.outputs.type, 'deep'))
+      run: |
+        python scripts/send-notifications.py \
+          --type "${{ steps.audit-type.outputs.type }}" \
+          --status "${{ job.status }}" \
+          --url "$WEBSITE_URL"
+
+  # Cleanup old artifacts to save space
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 2 * * 0'  # Only on weekly runs
+    steps:
+    - name: Delete old workflow runs
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runs = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'seo-audit.yml',
+            per_page: 100
+          });
+          
+          // Keep last 10 runs, delete older ones
+          const runsToDelete = runs.data.workflow_runs.slice(10);
+          
+          for (const run of runsToDelete) {
+            await github.rest.actions.deleteWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id
+            });
+          }
