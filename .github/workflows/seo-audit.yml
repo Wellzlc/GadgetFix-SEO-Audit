@@ -86,13 +86,12 @@ jobs:
           *.json
         retention-days: 30
     
-    - name: Show Results
+   - name: Send Email Notification
       if: always()
       run: |
-        echo "=== SEO Audit Complete ==="
-        if [ -f "quick-results.json" ]; then
-          echo "✅ Results saved to quick-results.json"
-          cat quick-results.json
-        else
-          echo "❌ No results file found"
-        fi
+        echo "📧 Sending email notification..."
+        python scripts/send-notifications.py \
+          --type "${{ steps.audit-type.outputs.type }}" \
+          --status "${{ job.status }}" \
+          --url "$WEBSITE_URL" \
+          --results "quick-results.json"
