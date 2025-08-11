@@ -1,16 +1,16 @@
 name: SEO Audit System
 on:
-  # Optimal free-tier schedule
+  # Daily audits - optimized for free tier
   schedule:
-    - cron: '0 8 * * *'    # Daily at 8 AM UTC
-    - cron: '0 20 * * *'   # Daily at 8 PM UTC
-    - cron: '0 2 * * 0'    # Weekly deep audit (Sunday 2 AM UTC)
+    - cron: '0 8 * * *'    # 8 AM UTC daily
+    - cron: '0 20 * * *'   # 8 PM UTC daily  
+    - cron: '0 2 * * 0'    # Sunday 2 AM UTC (weekly deep dive)
   
-  # Manual trigger button
+  # Manual trigger
   workflow_dispatch:
     inputs:
       audit_type:
-        description: 'Type of audit to run'
+        description: 'Audit Type'
         required: true
         default: 'quick'
         type: choice
@@ -19,90 +19,333 @@ on:
         - full
         - deep
 
-env:
-  WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
-  PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
-
 jobs:
   seo-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
     steps:
-    - name: Checkout code
+    - name: Checkout Repository
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
     
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-    
-    - name: Install Python dependencies
+    - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 pandas lxml python-dotenv
+        pip install requests beautifulsoup4 lxml
     
-    - name: Install Node.js tools
+    - name: Create SEO Audit Script
       run: |
-        npm install -g lighthouse psi
-    
-    - name: Determine audit type
-      id: audit-type
-      run: |
-        if [ "${{ github.event.inputs.audit_type }}" != "" ]; then
-          echo "type=${{ github.event.inputs.audit_type }}" >> $GITHUB_OUTPUT
-        else
-          echo "type=quick" >> $GITHUB_OUTPUT
-        fi
+        mkdir -p scripts reports
+        cat > scripts/seo-audit.py << 'EOF'
+        #!/usr/bin/env python3
+        import requests
+        import json
+        import sys
+        import os
+        from datetime import datetime
+        from bs4 import BeautifulSoup
+        import re
+        
+        def run_seo_audit(url, audit_type="quick"):
+            """Complete SEO audit function"""
+            print(f"🔍 Starting {audit_type} SEO audit for: {url}")
+            
+            results = {
+                "url": url,
+                "audit_type": audit_type,
+                "timestamp": datetime.now().isoformat(),
+                "issues": [],
+                "recommendations": [],
+                "score": 0
+            }
+            
+            try:
+                # Fetch the page
+                print("📡 Fetching page...")
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)'
+                }
+                response = requests.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Basic metrics
+                results["status_code"] = response.status_code
+                results["response_time_ms"] = round(response.elapsed.total_seconds() * 1000)
+                results["content_size_kb"] = round(len(response.content) / 1024, 2)
+                
+                # SEO Checks
+                score = 0
+                max_score = 100
+                
+                # 1. Title Tag Analysis
+                title_tag = soup.find('title')
+                if title_tag:
+                    title_text = title_tag.get_text().strip()
+                    results["title"] = title_text
+                    results["title_length"] = len(title_text)
+                    
+                    if 30 <= len(title_text) <= 60:
+                        score += 15
+                        print("✅ Title length optimal (30-60 chars)")
+                    else:
+                        results["issues"].append(f"Title length suboptimal: {len(title_text)} chars")
+                        results["recommendations"].append("Optimize title to 30-60 characters")
+                else:
+                    results["issues"].append("Missing title tag")
+                    results["recommendations"].append("Add a descriptive title tag")
+                
+                # 2. Meta Description
+                meta_desc = soup.find('meta', attrs={'name': 'description'})
+                if meta_desc and meta_desc.get('content'):
+                    desc_text = meta_desc.get('content').strip()
+                    results["meta_description"] = desc_text
+                    results["meta_description_length"] = len(desc_text)
+                    
+                    if 120 <= len(desc_text) <= 160:
+                        score += 15
+                        print("✅ Meta description length optimal")
+                    else:
+                        results["issues"].append(f"Meta description length: {len(desc_text)} chars")
+                        results["recommendations"].append("Optimize meta description to 120-160 characters")
+                else:
+                    results["issues"].append("Missing meta description")
+                    results["recommendations"].append("Add a compelling meta description")
+                
+                # 3. Heading Structure
+                h1_tags = soup.find_all('h1')
+                if len(h1_tags) == 1:
+                    score += 10
+                    results["h1_text"] = h1_tags[0].get_text().strip()
+                    print("✅ Single H1 tag found")
+                elif len(h1_tags) == 0:
+                    results["issues"].append("No H1 tag found")
+                    results["recommendations"].append("Add one H1 tag to your page")
+                else:
+                    results["issues"].append(f"Multiple H1 tags found: {len(h1_tags)}")
+                    results["recommendations"].append("Use only one H1 tag per page")
+                
+                # 4. Image Alt Text
+                images = soup.find_all('img')
+                images_without_alt = [img for img in images if not img.get('alt')]
+                results["total_images"] = len(images)
+                results["images_without_alt"] = len(images_without_alt)
+                
+                if len(images) > 0:
+                    alt_percentage = ((len(images) - len(images_without_alt)) / len(images)) * 100
+                    if alt_percentage >= 90:
+                        score += 10
+                        print(f"✅ {alt_percentage:.1f}% of images have alt text")
+                    else:
+                        results["issues"].append(f"Only {alt_percentage:.1f}% of images have alt text")
+                        results["recommendations"].append("Add alt text to all images")
+                
+                # 5. Internal Links
+                internal_links = soup.find_all('a', href=True)
+                internal_count = len([link for link in internal_links if url in link['href'] or link['href'].startswith('/')])
+                results["internal_links_count"] = internal_count
+                
+                if internal_count >= 3:
+                    score += 10
+                    print(f"✅ {internal_count} internal links found")
+                else:
+                    results["issues"].append(f"Only {internal_count} internal links found")
+                    results["recommendations"].append("Add more internal links for better navigation")
+                
+                # 6. Page Speed Assessment
+                if results["response_time_ms"] <= 1000:
+                    score += 15
+                    print(f"✅ Fast response time: {results['response_time_ms']}ms")
+                elif results["response_time_ms"] <= 3000:
+                    score += 10
+                    results["issues"].append(f"Moderate response time: {results['response_time_ms']}ms")
+                    results["recommendations"].append("Optimize page speed for better performance")
+                else:
+                    results["issues"].append(f"Slow response time: {results['response_time_ms']}ms")
+                    results["recommendations"].append("Critical: Improve page loading speed")
+                
+                # 7. HTTPS Check
+                if url.startswith('https://'):
+                    score += 10
+                    print("✅ HTTPS enabled")
+                else:
+                    results["issues"].append("Site not using HTTPS")
+                    results["recommendations"].append("Enable HTTPS for security and SEO")
+                
+                # 8. Mobile Viewport
+                viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
+                if viewport_meta:
+                    score += 10
+                    print("✅ Viewport meta tag found")
+                else:
+                    results["issues"].append("Missing viewport meta tag")
+                    results["recommendations"].append("Add viewport meta tag for mobile optimization")
+                
+                # 9. Schema Markup
+                schema_scripts = soup.find_all('script', type='application/ld+json')
+                if schema_scripts:
+                    score += 5
+                    results["schema_markup_found"] = len(schema_scripts)
+                    print(f"✅ {len(schema_scripts)} schema markup blocks found")
+                else:
+                    results["recommendations"].append("Consider adding schema markup for rich snippets")
+                
+                # Calculate final score
+                results["score"] = min(score, max_score)
+                results["grade"] = get_seo_grade(results["score"])
+                
+                print(f"🎯 SEO Score: {results['score']}/100 ({results['grade']})")
+                print(f"📊 Found {len(results['issues'])} issues")
+                print(f"💡 Generated {len(results['recommendations'])} recommendations")
+                
+                return results
+                
+            except requests.exceptions.RequestException as e:
+                print(f"❌ Network error: {e}")
+                results["error"] = str(e)
+                return results
+            except Exception as e:
+                print(f"❌ Unexpected error: {e}")
+                results["error"] = str(e)
+                return results
+        
+        def get_seo_grade(score):
+            """Convert score to letter grade"""
+            if score >= 90: return "A+"
+            elif score >= 80: return "A"
+            elif score >= 70: return "B"
+            elif score >= 60: return "C"
+            elif score >= 50: return "D"
+            else: return "F"
+        
+        def send_email_summary(results):
+            """Send email notification"""
+            email = os.getenv('EMAIL_ADDRESS', 'wellz.levi@gmail.com')
+            
+            print(f"📧 Preparing email summary for {email}")
+            
+            # Create summary
+            summary = f"""
+        🔍 SEO Audit Complete for {results['url']}
+        
+        📊 Overall Score: {results['score']}/100 ({results['grade']})
+        ⏱️  Response Time: {results.get('response_time_ms', 'N/A')}ms
+        📄 Page Size: {results.get('content_size_kb', 'N/A')} KB
+        
+        {"🚨 Issues Found:" if results['issues'] else "✅ No Critical Issues Found"}
+        """
+            
+            for issue in results['issues'][:5]:  # Top 5 issues
+                summary += f"\n• {issue}"
+            
+            if len(results['issues']) > 5:
+                summary += f"\n... and {len(results['issues']) - 5} more issues"
+            
+            summary += f"\n\n💡 Top Recommendations:"
+            for rec in results['recommendations'][:3]:  # Top 3 recommendations
+                summary += f"\n• {rec}"
+            
+            summary += f"\n\n🔗 Quick Actions:\n• View your site: {results['url']}\n• Test page speed: https://pagespeed.web.dev/?url={results['url']}"
+            
+            print("=" * 50)
+            print("EMAIL SUMMARY")
+            print("=" * 50)
+            print(summary)
+            print("=" * 50)
+            print("✅ Email summary prepared")
+            
+            return True
+        
+        if __name__ == "__main__":
+            url = os.getenv('WEBSITE_URL', 'https://example.com')
+            audit_type = sys.argv[1] if len(sys.argv) > 1 else 'quick'
+            
+            # Run audit
+            results = run_seo_audit(url, audit_type)
+            
+            # Save results
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"reports/seo_audit_{timestamp}.json"
+            
+            with open(filename, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            # Also save as latest
+            with open('seo-results.json', 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            print(f"💾 Results saved to {filename}")
+            
+            # Send email summary
+            send_email_summary(results)
+            
+            # Exit with error if critical issues found
+            critical_issues = len([issue for issue in results.get('issues', []) if 'Critical' in issue])
+            if critical_issues > 0:
+                print(f"⚠️  {critical_issues} critical issues found")
+                sys.exit(1)
+            else:
+                print("🎉 Audit completed successfully!")
+                sys.exit(0)
+        EOF
     
     - name: Run SEO Audit
+      env:
+        WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
+        EMAIL_ADDRESS: wellz.levi@gmail.com
       run: |
-        echo "🔍 Running SEO audit for $WEBSITE_URL"
-        echo "Audit type: ${{ steps.audit-type.outputs.type }}"
-        
-        # Create reports directory
-        mkdir -p reports
-        
-        # Run the audit script
-        python scripts/quick-check.py
-        
-        # List what was created
-        echo "Files created:"
-        ls -la reports/ || echo "No reports directory"
-        ls -la *.json || echo "No JSON files"
+        echo "🚀 Starting SEO audit..."
+        audit_type="${{ github.event.inputs.audit_type || 'quick' }}"
+        python scripts/seo-audit.py "$audit_type"
     
     - name: Upload Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: seo-audit-results-${{ steps.audit-type.outputs.type }}-${{ github.run_number }}
+        name: seo-audit-${{ github.event.inputs.audit_type || 'quick' }}-${{ github.run_number }}
         path: |
           reports/
-          *.json
+          seo-results.json
         retention-days: 30
     
-    - name: Show Results
-      if: always()
-      run: |
-        echo "=== SEO Audit Complete ==="
-        if [ -f "quick-results.json" ]; then
-          echo "✅ Results saved to quick-results.json"
-          cat quick-results.json
-        else
-          echo "❌ No results file found"
-        fi
-    
-    - name: Send Email Notification
-      if: always()
-      run: |
-        echo "📧 Sending email notification..."
-        python scripts/send-notifications.py \
-          --type "${{ steps.audit-type.outputs.type }}" \
-          --status "${{ job.status }}" \
-          --url "$WEBSITE_URL" \
-          --results "quick-results.json"
+    - name: Create GitHub Issue for Critical Problems
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const results = JSON.parse(fs.readFileSync('seo-results.json', 'utf8'));
+            const issueBody = `
+          # 🚨 SEO Audit Failed
+          
+          **Website:** ${results.url}
+          **Timestamp:** ${results.timestamp}
+          **Score:** ${results.score}/100 (${results.grade})
+          
+          ## Issues Found:
+          ${results.issues.map(issue => `- ${issue}`).join('\n')}
+          
+          ## Recommendations:
+          ${results.recommendations.slice(0, 5).map(rec => `- ${rec}`).join('\n')}
+          
+          ## Quick Actions:
+          - [Test Page Speed](https://pagespeed.web.dev/?url=${encodeURIComponent(results.url)})
+          - [View Site](${results.url})
+          - [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          `;
+          
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 SEO Issues Detected - Score: ${results.score}/100`,
+              body: issueBody,
+              labels: ['seo-alert', 'automated']
+            });
+          } catch (error) {
+            console.log('Could not create issue:', error.message);
+          }
