@@ -1,0 +1,1 @@
+# GadgetFix-SEO-Audit
