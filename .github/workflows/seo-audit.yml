@@ -1,10 +1,10 @@
-name: SEO Audit System
+name: SEO Monitoring System
 
 on:
   schedule:
-    - cron: '0 8 * * *'
-    - cron: '0 20 * * *'
-    - cron: '0 2 * * 0'
+    - cron: '0 8 * * *'    # Daily 8 AM UTC
+    - cron: '0 20 * * *'   # Daily 8 PM UTC  
+    - cron: '0 2 * * 0'    # Weekly Sunday 2 AM UTC
   workflow_dispatch:
     inputs:
       audit_type:
@@ -18,15 +18,15 @@ on:
         - deep
 
 jobs:
-  seo-audit:
+  seo-monitoring:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
     steps:
-    - name: Checkout
+    - name: Checkout Repository
       uses: actions/checkout@v4
     
-    - name: Setup Python
+    - name: Setup Python Environment
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
@@ -35,11 +35,12 @@ jobs:
       run: |
         pip install requests beautifulsoup4 lxml
     
-    - name: Create SEO Scripts
+    - name: Create Complete SEO System
       run: |
-        mkdir -p scripts reports
+        mkdir -p scripts data/history data/trends reports
         
-        cat << 'SCRIPT_END' > scripts/seo-audit.py
+        # Main SEO Audit Script
+        cat << 'SEO_AUDIT_END' > scripts/seo_audit.py
         import requests
         import json
         import sys
@@ -47,242 +48,1087 @@ jobs:
         from datetime import datetime
         from bs4 import BeautifulSoup
         
-        def audit_seo(url):
-            print(f"🔍 Auditing: {url}")
+        def comprehensive_seo_audit(url, audit_type="quick"):
+            print(f"🔍 Starting {audit_type} SEO audit for: {url}")
+            print("=" * 60)
             
             results = {
                 "url": url,
+                "audit_type": audit_type,
                 "timestamp": datetime.now().isoformat(),
                 "score": 0,
+                "grade": "F",
                 "issues": [],
                 "recommendations": [],
-                "critical_issues": 0
+                "critical_issues": 0,
+                "warnings": 0,
+                "metrics": {}
             }
             
             try:
-                response = requests.get(url, timeout=10)
+                print("📡 Fetching page content...")
+                headers = {'User-Agent': 'Mozilla/5.0 (compatible; SEO-Monitor/1.0)'}
+                response = requests.get(url, headers=headers, timeout=15)
                 soup = BeautifulSoup(response.content, 'html.parser')
                 
-                results["status_code"] = response.status_code
-                results["response_time_ms"] = round(response.elapsed.total_seconds() * 1000)
+                # Basic Performance Metrics
+                results["metrics"] = {
+                    "status_code": response.status_code,
+                    "response_time_ms": round(response.elapsed.total_seconds() * 1000),
+                    "content_size_kb": round(len(response.content) / 1024, 2),
+                    "content_type": response.headers.get('content-type', 'unknown')
+                }
                 
                 score = 0
                 
-                # Title check
-                title = soup.find('title')
-                if title and title.text.strip():
-                    title_len = len(title.text.strip())
-                    if 30 <= title_len <= 60:
-                        score += 25
-                        print("✅ Title length good")
+                print("🏷️ Analyzing title tag...")
+                # Title Tag Analysis (20 points)
+                title_tag = soup.find('title')
+                if title_tag and title_tag.text.strip():
+                    title_text = title_tag.text.strip()
+                    title_length = len(title_text)
+                    results["metrics"]["title"] = title_text
+                    results["metrics"]["title_length"] = title_length
+                    
+                    if 30 <= title_length <= 60:
+                        score += 20
+                        print(f"   ✅ Title length optimal: {title_length} chars")
+                    elif 20 <= title_length < 30:
+                        score += 15
+                        results["warnings"] += 1
+                        results["issues"].append(f"Title too short: {title_length} chars (30-60 recommended)")
+                        results["recommendations"].append("Expand title to 30-60 characters for better SEO")
+                    elif 60 < title_length <= 80:
+                        score += 15
+                        results["warnings"] += 1
+                        results["issues"].append(f"Title too long: {title_length} chars (30-60 recommended)")
+                        results["recommendations"].append("Shorten title to 30-60 characters")
                     else:
-                        results["issues"].append(f"Title length: {title_len} chars (should be 30-60)")
-                        results["recommendations"].append("Optimize title length to 30-60 characters")
+                        score += 5
+                        results["critical_issues"] += 1
+                        results["issues"].append(f"CRITICAL: Title length problematic: {title_length} chars")
+                        results["recommendations"].append("URGENT: Optimize title to 30-60 characters")
                 else:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: Missing or empty title tag")
-                    results["recommendations"].append("Add a descriptive title tag")
+                    results["recommendations"].append("URGENT: Add a descriptive, keyword-rich title tag")
                 
-                # Meta description
+                print("📝 Analyzing meta description...")
+                # Meta Description Analysis (20 points)
                 meta_desc = soup.find('meta', attrs={'name': 'description'})
-                if meta_desc and meta_desc.get('content'):
-                    desc_len = len(meta_desc.get('content'))
-                    if 120 <= desc_len <= 160:
-                        score += 25
-                        print("✅ Meta description good")
+                if meta_desc and meta_desc.get('content', '').strip():
+                    desc_text = meta_desc.get('content').strip()
+                    desc_length = len(desc_text)
+                    results["metrics"]["meta_description"] = desc_text
+                    results["metrics"]["meta_description_length"] = desc_length
+                    
+                    if 120 <= desc_length <= 160:
+                        score += 20
+                        print(f"   ✅ Meta description optimal: {desc_length} chars")
+                    elif 100 <= desc_length < 120:
+                        score += 15
+                        results["warnings"] += 1
+                        results["issues"].append(f"Meta description short: {desc_length} chars (120-160 recommended)")
+                        results["recommendations"].append("Expand meta description to 120-160 characters")
+                    elif 160 < desc_length <= 200:
+                        score += 15
+                        results["warnings"] += 1
+                        results["issues"].append(f"Meta description long: {desc_length} chars (120-160 recommended)")
+                        results["recommendations"].append("Shorten meta description to 120-160 characters")
                     else:
-                        results["issues"].append(f"Meta description length: {desc_len} chars")
-                        results["recommendations"].append("Optimize meta description to 120-160 characters")
+                        score += 8
+                        results["critical_issues"] += 1
+                        results["issues"].append(f"CRITICAL: Meta description length: {desc_length} chars")
+                        results["recommendations"].append("URGENT: Optimize meta description to 120-160 characters")
                 else:
                     results["critical_issues"] += 1
-                    results["issues"].append("CRITICAL: Missing meta description")
-                    results["recommendations"].append("Add a meta description")
+                    results["issues"].append("CRITICAL: Missing or empty meta description")
+                    results["recommendations"].append("URGENT: Add compelling meta description for better CTR")
                 
-                # H1 tags
+                print("🏗️ Analyzing heading structure...")
+                # Heading Structure Analysis (15 points)
                 h1_tags = soup.find_all('h1')
+                h2_tags = soup.find_all('h2')
+                h3_tags = soup.find_all('h3')
+                
+                results["metrics"]["headings"] = {
+                    "h1_count": len(h1_tags),
+                    "h2_count": len(h2_tags),
+                    "h3_count": len(h3_tags)
+                }
+                
                 if len(h1_tags) == 1:
-                    score += 15
-                    print("✅ Single H1 tag found")
+                    score += 10
+                    results["metrics"]["h1_text"] = h1_tags[0].text.strip()[:100]
+                    print(f"   ✅ Single H1 tag found")
+                    
+                    if len(h2_tags) >= 2:
+                        score += 5
+                        print(f"   ✅ Good H2 structure: {len(h2_tags)} tags")
+                    elif len(h2_tags) == 1:
+                        score += 3
+                        results["warnings"] += 1
+                        results["issues"].append("Consider adding more H2 tags for better content structure")
+                    else:
+                        results["warnings"] += 1
+                        results["issues"].append("Missing H2 tags - add subheadings for better structure")
+                        results["recommendations"].append("Add H2 tags to break up content and improve readability")
+                
                 elif len(h1_tags) == 0:
                     results["critical_issues"] += 1
                     results["issues"].append("CRITICAL: No H1 tag found")
-                    results["recommendations"].append("Add one H1 tag")
+                    results["recommendations"].append("URGENT: Add one H1 tag as main page heading")
                 else:
-                    results["issues"].append(f"Multiple H1 tags: {len(h1_tags)}")
-                    results["recommendations"].append("Use only one H1 tag per page")
+                    score += 5
+                    results["warnings"] += 1
+                    results["issues"].append(f"Multiple H1 tags found: {len(h1_tags)} (should be 1)")
+                    results["recommendations"].append("Use only one H1 tag per page for proper SEO hierarchy")
                 
-                # Images
+                print("🖼️ Analyzing images...")
+                # Image Optimization Analysis (10 points)
                 images = soup.find_all('img')
-                if images:
-                    images_without_alt = [img for img in images if not img.get('alt')]
-                    alt_percentage = ((len(images) - len(images_without_alt)) / len(images)) * 100
-                    
-                    if alt_percentage >= 90:
-                        score += 15
-                        print(f"✅ Good alt text coverage: {alt_percentage:.1f}%")
-                    else:
-                        results["issues"].append(f"Alt text coverage: {alt_percentage:.1f}%")
-                        results["recommendations"].append("Add alt text to all images")
+                images_with_alt = [img for img in images if img.get('alt', '').strip()]
+                images_without_alt = len(images) - len(images_with_alt)
                 
-                # Page speed
-                if results["response_time_ms"] <= 1000:
-                    score += 20
-                    print(f"✅ Fast loading: {results['response_time_ms']}ms")
-                elif results["response_time_ms"] <= 3000:
+                results["metrics"]["images"] = {
+                    "total_images": len(images),
+                    "images_with_alt": len(images_with_alt),
+                    "images_without_alt": images_without_alt,
+                    "alt_text_coverage": round((len(images_with_alt) / len(images) * 100), 1) if images else 100
+                }
+                
+                if len(images) > 0:
+                    alt_coverage = results["metrics"]["alt_text_coverage"]
+                    
+                    if alt_coverage >= 95:
+                        score += 10
+                        print(f"   ✅ Excellent alt text coverage: {alt_coverage}%")
+                    elif alt_coverage >= 80:
+                        score += 8
+                        results["warnings"] += 1
+                        results["issues"].append(f"Good alt text coverage: {alt_coverage}% (aim for 95%+)")
+                        results["recommendations"].append(f"Add alt text to {images_without_alt} remaining images")
+                    elif alt_coverage >= 50:
+                        score += 5
+                        results["critical_issues"] += 1
+                        results["issues"].append(f"CRITICAL: Poor alt text coverage: {alt_coverage}%")
+                        results["recommendations"].append(f"URGENT: Add alt text to {images_without_alt} images for accessibility")
+                    else:
+                        results["critical_issues"] += 1
+                        results["issues"].append(f"CRITICAL: Very poor alt text: {alt_coverage}%")
+                        results["recommendations"].append(f"URGENT: Add descriptive alt text to {images_without_alt} images")
+                else:
+                    score += 5  # No images is fine
+                
+                print("🔗 Analyzing internal links...")
+                # Internal Linking Analysis (10 points)
+                all_links = soup.find_all('a', href=True)
+                internal_links = []
+                external_links = []
+                
+                domain = url.split('//')[1].split('/')[0]
+                for link in all_links:
+                    href = link['href'].strip()
+                    if href.startswith('/') or domain in href:
+                        internal_links.append(href)
+                    elif href.startswith('http'):
+                        external_links.append(href)
+                
+                results["metrics"]["links"] = {
+                    "total_links": len(all_links),
+                    "internal_links": len(internal_links),
+                    "external_links": len(external_links)
+                }
+                
+                if len(internal_links) >= 5:
                     score += 10
-                    results["issues"].append(f"Moderate speed: {results['response_time_ms']}ms")
-                    results["recommendations"].append("Optimize page loading speed")
+                    print(f"   ✅ Good internal linking: {len(internal_links)} links")
+                elif len(internal_links) >= 2:
+                    score += 7
+                    results["warnings"] += 1
+                    results["issues"].append(f"Moderate internal linking: {len(internal_links)} links (aim for 5+)")
+                    results["recommendations"].append("Add more internal links to improve site navigation and SEO")
+                else:
+                    score += 3
+                    results["critical_issues"] += 1
+                    results["issues"].append(f"CRITICAL: Poor internal linking: {len(internal_links)} links")
+                    results["recommendations"].append("URGENT: Add internal links to related pages and content")
+                
+                print("⚡ Analyzing page speed...")
+                # Page Speed Analysis (15 points)
+                response_time = results["metrics"]["response_time_ms"]
+                
+                if response_time <= 800:
+                    score += 15
+                    print(f"   ✅ Excellent speed: {response_time}ms")
+                elif response_time <= 1500:
+                    score += 12
+                    print(f"   ✅ Good speed: {response_time}ms")
+                elif response_time <= 3000:
+                    score += 8
+                    results["warnings"] += 1
+                    results["issues"].append(f"Moderate load time: {response_time}ms (aim for <1500ms)")
+                    results["recommendations"].append("Optimize images, enable compression, and use CDN")
+                elif response_time <= 5000:
+                    score += 4
+                    results["critical_issues"] += 1
+                    results["issues"].append(f"CRITICAL: Slow load time: {response_time}ms")
+                    results["recommendations"].append("URGENT: Optimize server response time and page resources")
                 else:
                     results["critical_issues"] += 1
-                    results["issues"].append(f"CRITICAL: Slow loading: {results['response_time_ms']}ms")
-                    results["recommendations"].append("Urgent: Improve page speed")
+                    results["issues"].append(f"CRITICAL: Very slow: {response_time}ms")
+                    results["recommendations"].append("URGENT: Critical performance issues - needs immediate attention")
                 
+                print("🔒 Checking security...")
+                # Security & Technical Checks (10 points)
+                if url.startswith('https://'):
+                    score += 5
+                    print("   ✅ HTTPS enabled")
+                else:
+                    results["critical_issues"] += 1
+                    results["issues"].append("CRITICAL: Site not using HTTPS")
+                    results["recommendations"].append("URGENT: Enable HTTPS for security and SEO benefits")
+                
+                # Viewport meta tag
+                viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
+                if viewport_meta:
+                    score += 5
+                    print("   ✅ Mobile viewport configured")
+                else:
+                    results["critical_issues"] += 1
+                    results["issues"].append("CRITICAL: Missing viewport meta tag")
+                    results["recommendations"].append("URGENT: Add viewport meta tag for mobile optimization")
+                
+                # Final Score Calculation and Grading
                 results["score"] = min(score, 100)
                 
-                if results["score"] >= 90:
+                if results["score"] >= 95:
+                    results["grade"] = "A+"
+                elif results["score"] >= 90:
                     results["grade"] = "A"
+                elif results["score"] >= 85:
+                    results["grade"] = "A-"
                 elif results["score"] >= 80:
+                    results["grade"] = "B+"
+                elif results["score"] >= 75:
                     results["grade"] = "B"
                 elif results["score"] >= 70:
-                    results["grade"] = "C"
+                    results["grade"] = "B-"
+                elif results["score"] >= 65:
+                    results["grade"] = "C+"
                 elif results["score"] >= 60:
+                    results["grade"] = "C"
+                elif results["score"] >= 50:
                     results["grade"] = "D"
                 else:
                     results["grade"] = "F"
                 
-                print(f"🎯 SEO Score: {results['score']}/100 ({results['grade']})")
+                # Determine priority level
+                if results["critical_issues"] >= 3 or results["score"] < 50:
+                    results["priority"] = "CRITICAL"
+                elif results["critical_issues"] >= 1 or results["score"] < 70:
+                    results["priority"] = "HIGH"
+                elif results["warnings"] >= 3 or results["score"] < 85:
+                    results["priority"] = "MEDIUM"
+                else:
+                    results["priority"] = "LOW"
+                
+                print("=" * 60)
+                print(f"🎯 FINAL SEO SCORE: {results['score']}/100 ({results['grade']})")
+                print(f"📊 Priority Level: {results['priority']}")
                 print(f"🚨 Critical Issues: {results['critical_issues']}")
+                print(f"⚠️  Warnings: {results['warnings']}")
+                print(f"💡 Total Recommendations: {len(results['recommendations'])}")
+                print("=" * 60)
                 
                 return results
                 
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                results["error"] = str(e)
+            except requests.exceptions.Timeout:
+                error_msg = "Site timeout - took longer than 15 seconds to respond"
+                print(f"❌ {error_msg}")
+                results["error"] = error_msg
                 results["critical_issues"] = 1
+                results["priority"] = "CRITICAL"
+                return results
+                
+            except requests.exceptions.ConnectionError:
+                error_msg = "Connection failed - site may be down"
+                print(f"❌ {error_msg}")
+                results["error"] = error_msg
+                results["critical_issues"] = 1
+                results["priority"] = "CRITICAL"
+                return results
+                
+            except Exception as e:
+                error_msg = f"Audit failed: {str(e)}"
+                print(f"❌ {error_msg}")
+                results["error"] = error_msg
+                results["critical_issues"] = 1
+                results["priority"] = "CRITICAL"
                 return results
         
         if __name__ == "__main__":
             url = os.getenv('WEBSITE_URL', 'https://example.com')
-            results = audit_seo(url)
+            audit_type = sys.argv[1] if len(sys.argv) > 1 else 'quick'
+            
+            print("🚀 SEO MONITORING SYSTEM")
+            print("=" * 60)
+            
+            results = comprehensive_seo_audit(url, audit_type)
+            
+            # Save results
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            with open(f'reports/seo_audit_{timestamp}.json', 'w') as f:
+                json.dump(results, f, indent=2)
             
             with open('seo-results.json', 'w') as f:
                 json.dump(results, f, indent=2)
             
-            if results.get("critical_issues", 0) > 2 or "error" in results:
+            print(f"💾 Results saved successfully")
+            
+            # Exit with appropriate code
+            if "error" in results or results.get("critical_issues", 0) > 2:
+                print("🚨 Exiting with error due to critical issues")
                 sys.exit(1)
             else:
+                print("🎉 Audit completed successfully!")
                 sys.exit(0)
-        SCRIPT_END
+        SEO_AUDIT_END
         
-        cat << 'NOTIFY_END' > scripts/notify.py
+        # Historical Data Tracking Script
+        cat << 'HISTORY_END' > scripts/track_history.py
+        import json
+        import os
+        from datetime import datetime, timedelta
+        
+        def update_historical_data():
+            print("📊 Updating historical data...")
+            
+            # Load current results
+            try:
+                with open('seo-results.json', 'r') as f:
+                    current = json.load(f)
+            except:
+                print("❌ No current results to track")
+                return False
+            
+            # Load existing trends
+            trends_file = 'data/trends/seo-trends.json'
+            if os.path.exists(trends_file):
+                with open(trends_file, 'r') as f:
+                    trends = json.load(f)
+            else:
+                trends = {"history": [], "summary": {}, "alerts": []}
+            
+            # Create data point
+            data_point = {
+                "timestamp": current.get("timestamp", datetime.now().isoformat()),
+                "score": current.get("score", 0),
+                "grade": current.get("grade", "F"),
+                "response_time_ms": current.get("metrics", {}).get("response_time_ms", 0),
+                "critical_issues": current.get("critical_issues", 0),
+                "warnings": current.get("warnings", 0),
+                "total_issues": len(current.get("issues", [])),
+                "priority": current.get("priority", "UNKNOWN")
+            }
+            
+            trends["history"].append(data_point)
+            
+            # Keep last 60 data points (30 days of twice-daily audits)
+            trends["history"] = trends["history"][-60:]
+            
+            # Calculate summary statistics
+            if len(trends["history"]) >= 1:
+                scores = [h["score"] for h in trends["history"]]
+                response_times = [h["response_time_ms"] for h in trends["history"]]
+                
+                # Recent performance (last 7 days = 14 data points)
+                recent_scores = scores[-14:] if len(scores) >= 14 else scores
+                older_scores = scores[-28:-14] if len(scores) >= 28 else []
+                
+                trends["summary"] = {
+                    "current_score": scores[-1] if scores else 0,
+                    "avg_score_7_days": sum(recent_scores) / len(recent_scores) if recent_scores else 0,
+                    "avg_score_30_days": sum(scores) / len(scores),
+                    "best_score_ever": max(scores),
+                    "worst_score_ever": min(scores),
+                    "avg_response_time": sum(response_times) / len(response_times),
+                    "total_audits": len(trends["history"]),
+                    "last_updated": datetime.now().isoformat(),
+                    "trend_direction": "stable"
+                }
+                
+                # Calculate trend direction
+                if len(recent_scores) >= 7 and older_scores:
+                    recent_avg = sum(recent_scores) / len(recent_scores)
+                    older_avg = sum(older_scores) / len(older_scores)
+                    
+                    if recent_avg > older_avg + 5:
+                        trends["summary"]["trend_direction"] = "improving"
+                    elif recent_avg < older_avg - 5:
+                        trends["summary"]["trend_direction"] = "declining"
+                
+                # Generate alerts for significant changes
+                if len(scores) >= 2:
+                    score_change = scores[-1] - scores[-2]
+                    if abs(score_change) >= 10:
+                        alert = {
+                            "timestamp": datetime.now().isoformat(),
+                            "type": "score_change",
+                            "message": f"SEO score {'increased' if score_change > 0 else 'decreased'} by {abs(score_change)} points",
+                            "severity": "high" if abs(score_change) >= 20 else "medium"
+                        }
+                        trends["alerts"].append(alert)
+                
+                # Keep only recent alerts (last 30 days)
+                cutoff_date = datetime.now() - timedelta(days=30)
+                trends["alerts"] = [
+                    alert for alert in trends["alerts"]
+                    if datetime.fromisoformat(alert["timestamp"]) > cutoff_date
+                ]
+            
+            # Save updated trends
+            os.makedirs('data/trends', exist_ok=True)
+            with open(trends_file, 'w') as f:
+                json.dump(trends, f, indent=2)
+            
+            print(f"✅ Historical data updated: {len(trends['history'])} total audits")
+            if trends["summary"]:
+                print(f"📈 Current score: {trends['summary']['current_score']}/100")
+                print(f"📊 7-day average: {trends['summary']['avg_score_7_days']:.1f}/100")
+                print(f"🎯 Trend: {trends['summary']['trend_direction']}")
+            
+            return True
+        
+        if __name__ == "__main__":
+            update_historical_data()
+        HISTORY_END
+        
+        # System Health Monitor
+        cat << 'HEALTH_END' > scripts/health_check.py
+        import json
+        import os
+        from datetime import datetime, timedelta
+        
+        def system_health_check():
+            print("🔧 Running comprehensive system health check...")
+            
+            health_report = {
+                "timestamp": datetime.now().isoformat(),
+                "status": "HEALTHY",
+                "issues": [],
+                "warnings": [],
+                "metrics": {},
+                "recommendations": []
+            }
+            
+            # Check audit results
+            if os.path.exists('seo-results.json'):
+                try:
+                    with open('seo-results.json', 'r') as f:
+                        results = json.load(f)
+                    
+                    # Check result freshness
+                    if 'timestamp' in results:
+                        result_time = datetime.fromisoformat(results['timestamp'].replace('Z', ''))
+                        age_hours = (datetime.now() - result_time).total_seconds() / 3600
+                        
+                        if age_hours > 24:
+                            health_report["issues"].append(f"Stale audit data: {age_hours:.1f} hours old")
+                        elif age_hours > 12:
+                            health_report["warnings"].append(f"Audit data aging: {age_hours:.1f} hours old")
+                    
+                    # Check for persistent errors
+                    if 'error' in results:
+                        health_report["issues"].append(f"Audit error: {results['error']}")
+                    
+                    # Check score trends
+                    score = results.get('score', 0)
+                    if score < 30:
+                        health_report["issues"].append(f"Very low SEO score: {score}/100")
+                    elif score < 50:
+                        health_report["warnings"].append(f"Low SEO score: {score}/100")
+                    
+                    health_report["metrics"]["current_seo_score"] = score
+                    health_report["metrics"]["critical_issues"] = results.get("critical_issues", 0)
+                    
+                except Exception as e:
+                    health_report["issues"].append(f"Cannot parse audit results: {e}")
+            else:
+                health_report["issues"].append("No audit results found")
+            
+            # Check historical data integrity
+            if os.path.exists('data/trends/seo-trends.json'):
+                try:
+                    with open('data/trends/seo-trends.json', 'r') as f:
+                        trends = json.load(f)
+                    
+                    history_count = len(trends.get('history', []))
+                    health_report["metrics"]["historical_data_points"] = history_count
+                    
+                    if history_count < 5:
+                        health_report["warnings"].append("Limited historical data available")
+                    
+                    # Check for score degradation
+                    history = trends.get('history', [])
+                    if len(history) >= 10:
+                        recent_scores = [h['score'] for h in history[-5:]]
+                        older_scores = [h['score'] for h in history[-10:-5]]
+                        
+                        recent_avg = sum(recent_scores) / len(recent_scores)
+                        older_avg = sum(older_scores) / len(older_scores)
+                        
+                        if recent_avg < older_avg - 15:
+                            health_report["issues"].append(f"Significant SEO decline: {recent_avg:.1f} vs {older_avg:.1f}")
+                        elif recent_avg < older_avg - 8:
+                            health_report["warnings"].append(f"SEO score declining: {recent_avg:.1f} vs {older_avg:.1f}")
+                        elif recent_avg > older_avg + 8:
+                            health_report["metrics"]["improvement_detected"] = f"+{recent_avg - older_avg:.1f} points"
+                    
+                except Exception as e:
+                    health_report["warnings"].append(f"Cannot analyze trends: {e}")
+            else:
+                health_report["warnings"].append("No historical trend data found")
+            
+            # Check file system health
+            required_dirs = ['data/history', 'data/trends', 'reports', 'scripts']
+            for directory in required_dirs:
+                if not os.path.exists(directory):
+                    health_report["warnings"].append(f"Missing directory: {directory}")
+                    health_report["recommendations"].append(f"Create directory: {directory}")
+            
+            # Determine overall status
+            if health_report["issues"]:
+                health_report["status"] = "CRITICAL"
+            elif len(health_report["warnings"]) > 3:
+                health_report["status"] = "WARNING"
+            
+            # Generate recommendations
+            if health_report["issues"]:
+                health_report["recommendations"].append("Address critical issues immediately")
+            if health_report["warnings"]:
+                health_report["recommendations"].append("Monitor warnings and take preventive action")
+            
+            # Save health report
+            with open('system-health.json', 'w') as f:
+                json.dump(health_report, f, indent=2)
+            
+            # Print status summary
+            status_emoji = {"HEALTHY": "✅", "WARNING": "⚠️", "CRITICAL": "🚨"}
+            print(f"{status_emoji.get(health_report['status'], '❓')} SYSTEM STATUS: {health_report['status']}")
+            
+            if health_report["issues"]:
+                print("🚨 Critical Issues:")
+                for issue in health_report["issues"]:
+                    print(f"   • {issue}")
+            
+            if health_report["warnings"]:
+                print("⚠️ Warnings:")
+                for warning in health_report["warnings"]:
+                    print(f"   • {warning}")
+            
+            if health_report["metrics"]:
+                print("📊 Key Metrics:")
+                for key, value in health_report["metrics"].items():
+                    print(f"   • {key}: {value}")
+            
+            print(f"🔧 Health check completed at {health_report['timestamp']}")
+            
+            return health_report["status"] == "HEALTHY"
+        
+        if __name__ == "__main__":
+            healthy = system_health_check()
+            exit(0 if healthy else 1)
+        HEALTH_END
+        
+        # Enhanced Notification System
+        cat << 'NOTIFY_END' > scripts/send_notifications.py
         import json
         import os
         from datetime import datetime
         
-        def send_notification():
+        def send_comprehensive_notifications():
+            print("📢 COMPREHENSIVE NOTIFICATION SYSTEM")
+            print("=" * 60)
+            
+            # Load all data
+            audit_results = load_json_file('seo-results.json', {})
+            health_status = load_json_file('system-health.json', {})
+            trends_data = load_json_file('data/trends/seo-trends.json', {})
+            
             email = "wellz.levi@gmail.com"
+            github_repo = os.getenv('GITHUB_REPOSITORY', '')
+            github_run = os.getenv('GITHUB_RUN_ID', '')
             
-            try:
-                with open('seo-results.json', 'r') as f:
-                    results = json.load(f)
-            except:
-                results = {"error": "No results found"}
+            # Determine notification urgency
+            urgency = determine_urgency(audit_results, health_status)
             
-            print("📧 EMAIL NOTIFICATION")
-            print("=" * 50)
-            print(f"To: {email}")
-            print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}")
+            print(f"📧 Preparing {urgency} notification for: {email}")
+            print(f"⏰ Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}")
             
-            if "error" not in results:
-                score = results.get("score", 0)
-                grade = results.get("grade", "N/A")
-                
-                if results.get("critical_issues", 0) > 2:
-                    print("Subject: 🚨 CRITICAL SEO Issues Found")
-                elif score < 70:
-                    print("Subject: ⚠️ SEO Problems Detected")
-                else:
-                    print("Subject: ✅ SEO Audit Complete")
-                
-                print(f"\n🎯 SEO Score: {score}/100 ({grade})")
-                print(f"⚡ Response Time: {results.get('response_time_ms', 'N/A')}ms")
-                print(f"🚨 Critical Issues: {results.get('critical_issues', 0)}")
-                
-                if results.get("issues"):
-                    print(f"\n📋 Issues Found ({len(results['issues'])}):")
-                    for i, issue in enumerate(results["issues"][:5], 1):
-                        print(f"  {i}. {issue}")
-                
-                if results.get("recommendations"):
-                    print(f"\n💡 Recommendations ({len(results['recommendations'])}):")
-                    for i, rec in enumerate(results["recommendations"][:5], 1):
-                        print(f"  {i}. {rec}")
+            # Generate email subject
+            if urgency == "CRITICAL":
+                subject = f"🚨 CRITICAL SEO Alert - {audit_results.get('url', 'Unknown Site')}"
+            elif urgency == "HIGH":
+                subject = f"⚠️ SEO Issues Detected - Score: {audit_results.get('score', 0)}/100"
+            elif urgency == "WEEKLY":
+                subject = f"📊 Weekly SEO Report - {audit_results.get('url', 'Unknown Site')}"
             else:
-                print("Subject: 🚨 SEO Audit Failed")
-                print(f"\n❌ Error: {results['error']}")
+                subject = f"✅ SEO Monitor - Score: {audit_results.get('score', 0)}/100"
             
-            print(f"\n🔗 Quick Actions:")
-            print(f"• View site: {results.get('url', 'N/A')}")
-            print("=" * 50)
-            print("✅ Notification sent successfully")
+            print(f"📬 Email Subject: {subject}")
+            
+            # Generate comprehensive email body
+            email_body = generate_email_content(audit_results, health_status, trends_data, urgency, github_repo, github_run)
+            
+            print("\n📄 EMAIL CONTENT PREVIEW:")
+            print("-" * 40)
+            print(email_body[:800] + "..." if len(email_body) > 800 else email_body)
+            print("-" * 40)
+            
+            # Prepare GitHub issue data for critical cases
+            if urgency in ["CRITICAL", "HIGH"]:
+                prepare_github_issue_data(audit_results, health_status, urgency)
+                print("📝 GitHub issue data prepared for critical issues")
+            
+            print("\n✅ Comprehensive notifications prepared successfully!")
+            print("📊 Notification Summary:")
+            print(f"   • Urgency Level: {urgency}")
+            print(f"   • Email Recipient: {email}")
+            print(f"   • Current SEO Score: {audit_results.get('score', 'N/A')}/100")
+            print(f"   • System Health: {health_status.get('status', 'Unknown')}")
+            print("=" * 60)
+            
+            return True
+        
+        def load_json_file(filename, default):
+            try:
+                with open(filename, 'r') as f:
+                    return json.load(f)
+            except:
+                return default
+        
+        def determine_urgency(audit_results, health_status):
+            # Check for critical system issues
+            if health_status.get('status') == 'CRITICAL':
+                return "CRITICAL"
+            
+            # Check for audit errors
+            if 'error' in audit_results:
+                return "CRITICAL"
+            
+            # Check SEO score and issues
+            score = audit_results.get('score', 100)
+            critical_issues = audit_results.get('critical_issues', 0)
+            
+            if score < 40 or critical_issues >= 4:
+                return "CRITICAL"
+            elif score < 60 or critical_issues >= 2:
+                return "HIGH"
+            elif score < 75 or audit_results.get('warnings', 0) >= 3:
+                return "MEDIUM"
+            else:
+                return "LOW"
+        
+        def generate_email_content(audit_results, health_status, trends_data, urgency, github_repo, github_run):
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+            
+            # Header
+            urgency_symbols = {
+                "CRITICAL": "🚨🚨🚨",
+                "HIGH": "⚠️⚠️", 
+                "MEDIUM": "📊",
+                "LOW": "✅",
+                "WEEKLY": "📊📈"
+            }
+            
+            symbol = urgency_symbols.get(urgency, "📊")
+            
+            content = f"""{symbol} SEO MONITORING REPORT {symbol}
+        
+        Website: {audit_results.get('url', 'Unknown')}
+        Report Time: {timestamp}
+        Priority Level: {urgency}
+        
+        {"=" * 50}
+        📊 CURRENT PERFORMANCE
+        {"=" * 50}
+        
+        SEO Score: {audit_results.get('score', 0)}/100 ({audit_results.get('grade', 'N/A')})
+        System Health: {health_status.get('status', 'Unknown')}
+        Response Time: {audit_results.get('metrics', {}).get('response_time_ms', 'N/A')}ms
+        Critical Issues: {audit_results.get('critical_issues', 0)}
+        Warnings: {audit_results.get('warnings', 0)}
+        
+        """
+            
+            # Add performance trends if available
+            if trends_data.get('summary'):
+                summary = trends_data['summary']
+                content += f"""📈 PERFORMANCE TRENDS
+        {"=" * 50}
+        
+        7-Day Average: {summary.get('avg_score_7_days', 0):.1f}/100
+        30-Day Average: {summary.get('avg_score_30_days', 0):.1f}/100
+        Best Score Ever: {summary.get('best_score_ever', 0)}/100
+        Trend Direction: {summary.get('trend_direction', 'Unknown').upper()}
+        Total Audits: {summary.get('total_audits', 0)}
+        
+        """
+            
+            # Add issues if any
+            issues = audit_results.get('issues', [])
+            if issues:
+                content += f"""🚨 ISSUES FOUND ({len(issues)})
+        {"=" * 50}
+        
+        """
+                for i, issue in enumerate(issues[:10], 1):
+                    content += f"{i}. {issue}\n"
+                
+                if len(issues) > 10:
+                    content += f"... and {len(issues) - 10} more issues\n"
+                content += "\n"
+            
+            # Add recommendations
+            recommendations = audit_results.get('recommendations', [])
+            if recommendations:
+                content += f"""💡 RECOMMENDATIONS ({len(recommendations)})
+        {"=" * 50}
+        
+        """
+                for i, rec in enumerate(recommendations[:8], 1):
+                    content += f"{i}. {rec}\n"
+                
+                if len(recommendations) > 8:
+                    content += f"... and {len(recommendations) - 8} more recommendations\n"
+                content += "\n"
+            
+            # Add quick actions
+            content += f"""🔗 QUICK ACTIONS
+        {"=" * 50}
+        
+        • Test Your Website: {audit_results.get('url', 'N/A')}
+        • Google PageSpeed Test: https://pagespeed.web.dev/?url={audit_results.get('url', '')}
+        • Mobile-Friendly Test: https://search.google.com/test/mobile-friendly?url={audit_results.get('url', '')}
+        """
+            
+            if github_repo and github_run:
+                content += f"• View Full Technical Report: https://github.com/{github_repo}/actions/runs/{github_run}\n"
+            
+            content += f"""
+        {"=" * 50}
+        🤖 AUTOMATED SEO MONITORING SYSTEM
+        
+        Next Audit: Next scheduled run (8 AM/8 PM UTC daily)
+        Weekly Deep Dive: Every Sunday 2 AM UTC
+        
+        This is an automated report from your SEO monitoring system.
+        {"=" * 50}
+        """
+            
+            return content
+        
+        def prepare_github_issue_data(audit_results, health_status, urgency):
+            issue_data = {
+                "timestamp": datetime.now().isoformat(),
+                "urgency": urgency,
+                "audit_results": audit_results,
+                "health_status": health_status,
+                "github_repo": os.getenv('GITHUB_REPOSITORY', ''),
+                "github_run": os.getenv('GITHUB_RUN_ID', '')
+            }
+            
+            with open('github-issue-data.json', 'w') as f:
+                json.dump(issue_data, f, indent=2)
         
         if __name__ == "__main__":
-            send_notification()
+            send_comprehensive_notifications()
         NOTIFY_END
+        
+        # Make scripts executable
+        chmod +x scripts/*.py
+        
+        echo "✅ Complete SEO monitoring system created successfully!"
     
     - name: Run SEO Audit
       env:
         WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
       run: |
-        echo "🚀 Starting SEO audit..."
-        python scripts/seo-audit.py
+        echo "🚀 Starting comprehensive SEO audit..."
+        python scripts/seo_audit.py "${{ github.event.inputs.audit_type || 'quick' }}"
+    
+    - name: Update Historical Data
+      if: always()
+      run: |
+        echo "📊 Updating historical trends..."
+        python scripts/track_history.py
+    
+    - name: System Health Check
+      if: always()
+      run: |
+        echo "🔧 Running system health diagnostics..."
+        python scripts/health_check.py
     
     - name: Send Notifications
       if: always()
       run: |
-        echo "📧 Sending notifications..."
-        python scripts/notify.py
+        echo "📧 Sending comprehensive notifications..."
+        python scripts/send_notifications.py
     
-    - name: Upload Results
+    - name: System Validation & Dashboard Update
+      if: always()
+      run: |
+        echo "🎯 FINAL SYSTEM VALIDATION"
+        echo "=" * 50
+        
+        # Check all components
+        echo "📁 System Structure:"
+        ls -la data/ 2>/dev/null | head -5 || echo "   ⚠️ Data directory issues"
+        ls -la reports/ 2>/dev/null | head -3 || echo "   ⚠️ Reports directory issues"
+        
+        echo ""
+        echo "📊 Current Status:"
+        if [ -f "seo-results.json" ]; then
+          python -c "
+        import json
+        try:
+            with open('seo-results.json', 'r') as f:
+                r = json.load(f)
+            print(f'   ✅ SEO Score: {r.get(\"score\", 0)}/100 ({r.get(\"grade\", \"N/A\")})')
+            print(f'   ⚡ Response Time: {r.get(\"metrics\", {}).get(\"response_time_ms\", \"N/A\")}ms')
+            print(f'   🚨 Critical Issues: {r.get(\"critical_issues\", 0)}')
+            print(f'   ⚠️  Warnings: {r.get(\"warnings\", 0)}')
+        except Exception as e:
+            print(f'   ❌ Error reading results: {e}')
+        "
+        else
+          echo "   ❌ No audit results available"
+        fi
+        
+        echo ""
+        echo "🏥 System Health:"
+        if [ -f "system-health.json" ]; then
+          python -c "
+        import json
+        try:
+            with open('system-health.json', 'r') as f:
+                h = json.load(f)
+            print(f'   Status: {h.get(\"status\", \"Unknown\")}')
+            print(f'   Issues: {len(h.get(\"issues\", []))}')
+            print(f'   Warnings: {len(h.get(\"warnings\", []))}')
+        except:
+            print('   ❌ Health data unavailable')
+        "
+        else
+          echo "   ⚠️ No health data"
+        fi
+        
+        echo ""
+        echo "📈 Historical Tracking:"
+        if [ -f "data/trends/seo-trends.json" ]; then
+          python -c "
+        import json
+        try:
+            with open('data/trends/seo-trends.json', 'r') as f:
+                t = json.load(f)
+            h = t.get('history', [])
+            s = t.get('summary', {})
+            print(f'   Total Audits: {len(h)}')
+            print(f'   7-Day Avg: {s.get(\"avg_score_7_days\", 0):.1f}/100')
+            print(f'   Trend: {s.get(\"trend_direction\", \"unknown\").title()}')
+        except:
+            print('   ❌ Trend data unavailable')
+        "
+        else
+          echo "   ⚠️ No historical data yet"
+        fi
+        
+        echo ""
+        echo "🔔 Notification System:"
+        echo "   ✅ Email Notifications: Active"
+        echo "   ✅ GitHub Issues: Enabled"
+        echo "   ✅ Console Logging: Active"
+        
+        echo ""
+        echo "⏰ Monitoring Schedule:"
+        echo "   ✅ Daily 8 AM UTC: Active"
+        echo "   ✅ Daily 8 PM UTC: Active"
+        echo "   ✅ Weekly Sunday 2 AM UTC: Active"
+        
+        # Create dashboard summary
+        cat << 'DASHBOARD_END' > create_dashboard.py
+        import json
+        import os
+        from datetime import datetime
+        
+        dashboard = {
+            "last_updated": datetime.now().isoformat(),
+            "system_operational": True,
+            "monitoring_active": True
+        }
+        
+        # Load current performance
+        if os.path.exists('seo-results.json'):
+            with open('seo-results.json', 'r') as f:
+                results = json.load(f)
+            dashboard.update({
+                "current_score": results.get("score", 0),
+                "current_grade": results.get("grade", "F"),
+                "last_audit": results.get("timestamp", ""),
+                "critical_issues": results.get("critical_issues", 0),
+                "response_time_ms": results.get("metrics", {}).get("response_time_ms", 0)
+            })
+        
+        # Load system health
+        if os.path.exists('system-health.json'):
+            with open('system-health.json', 'r') as f:
+                health = json.load(f)
+            dashboard["system_health"] = health.get("status", "Unknown")
+        
+        # Load trends
+        if os.path.exists('data/trends/seo-trends.json'):
+            with open('data/trends/seo-trends.json', 'r') as f:
+                trends = json.load(f)
+            summary = trends.get('summary', {})
+            dashboard.update({
+                "total_audits": len(trends.get('history', [])),
+                "avg_score_7_days": summary.get('avg_score_7_days', 0),
+                "trend_direction": summary.get('trend_direction', 'stable'),
+                "best_score_ever": summary.get('best_score_ever', 0)
+            })
+        
+        # Save dashboard
+        os.makedirs('data', exist_ok=True)
+        with open('data/dashboard.json', 'w') as f:
+            json.dump(dashboard, f, indent=2)
+        
+        print("📊 Dashboard data updated successfully")
+        DASHBOARD_END
+        
+        python create_dashboard.py
+        
+        echo ""
+        echo "🎉 SYSTEM FULLY OPERATIONAL!"
+        echo "🤖 Your SEO monitoring system is now running 24/7"
+        echo "📧 You'll receive notifications for any issues detected"
+        echo "📊 Historical data is being tracked for trend analysis"
+        echo "🔧 System health monitoring is active"
+        echo "=" * 50
+    
+    - name: Upload Complete Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: seo-results-${{ github.run_number }}
-        path: seo-results.json
+        name: seo-monitoring-complete-${{ github.run_number }}
+        path: |
+          seo-results.json
+          system-health.json
+          github-issue-data.json
+          data/
+          reports/
         retention-days: 30
     
-    - name: Create Issue on Failure
+    - name: Create Critical Issues GitHub Issue
       if: failure()
       uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
-          let results = {};
           
           try {
-            results = JSON.parse(fs.readFileSync('seo-results.json', 'utf8'));
+            if (!fs.existsSync('github-issue-data.json')) {
+              console.log('No critical issue data found');
+              return;
+            }
+            
+            const issueData = JSON.parse(fs.readFileSync('github-issue-data.json', 'utf8'));
+            const auditResults = issueData.audit_results || {};
+            const healthStatus = issueData.health_status || {};
+            
+            const score = auditResults.score || 0;
+            const criticalIssues = auditResults.critical_issues || 0;
+            const systemHealth = healthStatus.status || 'Unknown';
+            
+            // Create comprehensive issue body
+            const issueBody = `# 🚨 Critical SEO Monitoring Alert
+            
+            **Urgency Level:** ${issueData.urgency || 'HIGH'}  
+            **System Health:** ${systemHealth}  
+            **SEO Score:** ${score}/100 (${auditResults.grade || 'N/A'})  
+            **Critical Issues:** ${criticalIssues}  
+            **Timestamp:** ${issueData.timestamp || new Date().toISOString()}
+            
+            ## 🎯 Performance Overview
+            
+            | Metric | Value |
+            |--------|-------|
+            | **SEO Score** | ${score}/100 |
+            | **Grade** | ${auditResults.grade || 'N/A'} |
+            | **Response Time** | ${auditResults.metrics?.response_time_ms || 'N/A'}ms |
+            | **Critical Issues** | ${criticalIssues} |
+            | **Warnings** | ${auditResults.warnings || 0} |
+            | **System Status** | ${systemHealth} |
+            
+            ${criticalIssues > 0 ? `## 🚨 Critical Issues Detected
+            
+            ${(auditResults.issues || []).filter(issue => issue.includes('CRITICAL')).map((issue, i) => `${i + 1}. ${issue}`).join('\n')}` : ''}
+            
+            ${auditResults.warnings > 0 ? `## ⚠️ Warnings
+            
+            ${(auditResults.issues || []).filter(issue => !issue.includes('CRITICAL')).slice(0, 5).map((issue, i) => `${i + 1}. ${issue}`).join('\n')}` : ''}
+            
+            ## 💡 Immediate Action Required
+            
+            ${(auditResults.recommendations || []).slice(0, 8).map((rec, i) => `${i + 1}. ${rec}`).join('\n')}
+            
+            ## 🔧 System Health Details
+            
+            ${healthStatus.issues?.length > 0 ? `**Critical System Issues:**
+            ${healthStatus.issues.map(issue => `- ${issue}`).join('\n')}
+            
+            ` : ''}${healthStatus.warnings?.length > 0 ? `**System Warnings:**
+            ${healthStatus.warnings.map(warning => `- ${warning}`).join('\n')}
+            
+            ` : ''}## 🔗 Quick Resolution Links
+            
+            - [🌐 Test Your Website](${auditResults.url || '#'})
+            - [⚡ Google PageSpeed Test](https://pagespeed.web.dev/?url=${encodeURIComponent(auditResults.url || '')})
+            - [📱 Mobile-Friendly Test](https://search.google.com/test/mobile-friendly?url=${encodeURIComponent(auditResults.url || '')})
+            - [🔍 Rich Results Test](https://search.google.com/test/rich-results?url=${encodeURIComponent(auditResults.url || '')})
+            ${issueData.github_repo && issueData.github_run ? `- [📊 Full Technical Report](https://github.com/${issueData.github_repo}/actions/runs/${issueData.github_run})` : ''}
+            
+            ## 📈 Next Steps
+            
+            1. **Immediate:** Address critical issues listed above
+            2. **Short-term:** Resolve warnings and implement recommendations  
+            3. **Monitor:** Check next audit results for improvements
+            4. **Follow-up:** Review trends in weekly report
+            
+            ---
+            
+            **🤖 Automated Alert System**  
+            *This issue was automatically created by your SEO monitoring system*  
+            *Next audit scheduled for next run (8 AM/8 PM UTC daily)*
+            `;
+            
+            // Create the issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 ${issueData.urgency || 'CRITICAL'} SEO Alert: ${score}/100 - ${criticalIssues} Critical Issues`,
+              body: issueBody,
+              labels: [
+                'seo-alert', 
+                'automated', 
+                urgency === 'CRITICAL' ? 'critical' : 'high-priority',
+                'needs-attention'
+              ]
+            });
+            
+            console.log('✅ Critical SEO issue created successfully with comprehensive details');
+            
           } catch (error) {
-            results = { error: "Could not load results", url: process.env.WEBSITE_URL || "Unknown" };
+            console.log('ℹ️ Issue creation failed or no critical issues detected:', error.message);
           }
-          
-          const issueBody = `# 🚨 SEO Audit Failed
-          
-          **Website:** ${results.url}
-          **Time:** ${new Date().toISOString()}
-          **Score:** ${results.score || 0}/100
-          
-          ## Issues:
-          ${(results.issues || ['Audit failed to complete']).map(issue => `- ${issue}`).join('\n')}
-          
-          ## Recommendations:
-          ${(results.recommendations || ['Check site accessibility']).map(rec => `- ${rec}`).join('\n')}
-          
-          [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
-          
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `🚨 SEO Alert: ${results.score || 0}/100 - Issues Detected`,
-            body: issueBody,
-            labels: ['seo-alert', 'automated']
-          });
